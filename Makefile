@@ -12,7 +12,7 @@ ADDR_COSMOS_KEY=keys/hubkey
 CHAIN_AG=$(shell curl -Ss "$(NETWORK_CONFIG)" | jq -r .chainName)
 RPC_IP=$(shell curl -Ss "$(NETWORK_CONFIG)" | jq -r .rpcAddrs[0] | cut -d":" -f1)
 
-start: task/create-channel
+start: 
 	$(HERMES) start
 
 hermes.config: 
