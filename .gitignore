@@ -3,3 +3,4 @@ keys
 task
 hermes.config
 ibc-relay-mnemonic
+*.bak

@@ -27,16 +27,16 @@ host = '127.0.0.1'
 port = 3001
 
 [[chains]]                                                               
-id = 'AG_CHAIN_NAME'
-rpc_addr = 'http://AG_RPC_IP:26657'
-grpc_addr = 'http://AG_RPC_IP:9090'
-websocket_addr = 'ws://AG_RPC_IP:26657/websocket'
+id = '@AG_CHAIN_NAME@'
+rpc_addr = '@AG_RPC@/'
+grpc_addr = '@AG_GRPC@/'
+websocket_addr = '@AG_WS@/websocket'
 rpc_timeout = '10s'
 account_prefix = 'agoric'
 key_name = 'agdevkey'
 store_prefix = 'ibc'
 max_gas = 3000000
-gas_price = { price = 0.001, denom = 'urun' }
+gas_price = { price = 0, denom = 'urun' }
 gas_adjustment = 0.1
 clock_drift = '5s'
 trusting_period = '14days'                                               
