@@ -1,6 +1,6 @@
-IMAGE_AGORIC=agoric/agoric-sdk:agoricstage-29
+IMAGE_AGORIC=agoric/agoric-sdk:agoricdev-11
 IMAGE_HERMES=informalsystems/hermes:0.14.1
-NETWORK_CONFIG=https://stage.agoric.net/network-config
+NETWORK_CONFIG=https://devnet.agoric.net/network-config
 #######
 
 CHAIN_COSMOS=cosmoshub-testnet
@@ -42,13 +42,15 @@ hermes.config: hermes.config.template
 
 KEYFILE=ibc-relay-mnemonic
 task/restore-keys: $(KEYFILE) hermes.config
+	mkdir -p keys hermes-home
+	sudo chown 1000 hermes-home
 	set -ue; \
-	mkdir -p keys ; \
-	MNEMONIC="$$(cat $(KEYFILE))"; \
-	echo $$MNEMONIC | sha1sum ; \
-	mkdir -p hermes-home; sudo chown 1000 hermes-home; \
-	$(HERMES) keys restore $(CHAIN_AG) -p "m/44'/564'/0'/0/0" -m "$$MNEMONIC" | awk '{print $$5}' | tr -d '()' > $(ADDR_AG_KEY); \
-	$(HERMES) keys restore $(CHAIN_COSMOS) -m "$$MNEMONIC" | awk '{print $$5}' | tr -d '()' > $(ADDR_COSMOS_KEY); \
+		MNEMONIC="$$(cat $(KEYFILE))"; \
+		echo $$MNEMONIC | sha1sum ; \
+		$(HERMES) --json keys restore $(CHAIN_AG) -p "m/44'/564'/0'/0/0" -m "$$MNEMONIC" | jq -r --exit-status '.result | capture("\\((?<addr>.*)\\)") | .addr' > keys/agdevaddr.tmp; \
+		$(HERMES) --json keys restore $(CHAIN_COSMOS) -m "$$MNEMONIC" | jq -r --exit-status '.result | capture("\\((?<addr>.*)\\)") | .addr' > keys/cosmosaddr.tmp
+	mv keys/agdevaddr.tmp keys/agdevaddr
+	mv keys/cosmosaddr.tmp keys/cosmosaddr
 	mkdir -p task && touch $@
 
 task/create-connection: hermes.config tasks
@@ -65,22 +67,22 @@ $(KEYFILE):
 	docker run --rm $(IMAGE_AGORIC) keys mnemonic >$@
 	chmod -w $@
 
-task/tap-cosmos-faucet: $(ADDR_COSMOS_KEY)
+task/tap-cosmos-faucet: keys/cosmosaddr
 	@echo tapping faucet
 	@echo per https://tutorials.cosmos.network/connecting-to-testnet/using-cli.html#requesting-tokens-from-the-faucet
-	curl -X POST -d '{"address": "$(shell cat ${ADDR_COSMOS_KEY})"}' https://faucet.testnet.cosmos.network | jq --exit-status '.status == "ok"'
+	curl -X POST -d '{"address": "$(shell cat keys/cosmosaddr)"}' https://faucet.testnet.cosmos.network | tee /dev/stderr | jq --exit-status '.transfers[0].status == "ok"'
 	mkdir -p task && touch $@
 
-task/tap-agoric-faucet: $(ADDR_AG_KEY)
+task/tap-agoric-faucet: keys/agdevaddr
 	case "$(RPC_ADDR)" in \
 	http://* | https://*) node="$(RPC_ADDR)" ;; \
 	*) node="tcp://$(RPC_ADDR)" ;; \
 	esac; \
-	if ! docker run --rm $(IMAGE_AGORIC) --node $$node query bank balances $(shell cat $(ADDR_AG_KEY)) -o json  | jq --exit-status '.balances[0]' || exit 1; then \
+	if ! docker run --rm $(IMAGE_AGORIC) --node $$node query bank balances $(shell cat keys/agdevaddr) -o json | tee /dev/stderr | jq --exit-status '.balances[0]' || exit 1; then \
 		echo if the balance below is empty,; \
 		echo visit https://agoric.com/discord; \
 		echo go to the "#faucet" channel; \
-		echo enter: !faucet client $(shell cat $(ADDR_AG_KEY)); \
+		echo enter: !faucet client $(shell cat keys/agdevaddr); \
 		echo press enter after this has been done; \
 		read dummy; \
 	fi
